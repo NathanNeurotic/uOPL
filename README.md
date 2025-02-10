@@ -6,7 +6,7 @@ Licensed under Academic Free License version 3.0
 Review the LICENSE file for further details.
 
 [![CI](https://github.com/NathanNeurotic/uOPL/actions/workflows/compilation.yml/badge.svg?branch=uOPL-1)](https://github.com/NathanNeurotic/uOPL/actions/workflows/compilation.yml)
-[![Codacy Badge](https://app.codacy.com/project/badge/Grade/99032a6a180243bfa0d0e23efeb0608d)](https://www.codacy.com/gh/NathanNeurotic/Unofficial-Open-PS2-Loader/dashboard?utm_source=github.com&utm_medium=referral&utm_content=NathanNeurotic/Unofficial-Open-PS2-Loader&utm_campaign=Badge_Grade)
+[![Codacy Badge](https://app.codacy.com/project/badge/Grade/99032a6a180243bfa0d0e23efeb0608d)](https://www.codacy.com/gh/NathanNeurotic/uOPL/dashboard?utm_source=github.com&utm_medium=referral&utm_content=NathanNeurotic/uOPL&utm_campaign=Badge_Grade)
 [![Discord](https://img.shields.io/discord/652861436992946216?style=flat&logo=Discord)]([https://discord.gg/CVFUa9xh6B](https://discord.gg/hFRysYVReu))
 
 ## Introduction
