@@ -1,19 +1,31 @@
-VERSION = 1
-SUBVERSION = 2
-PATCHLEVEL = 0
-EXTRAVERSION = unofficial
+#
+# Copyright (C) 2025 AndrÃ© "Wolf3s" Guilherme <andregui17@outlook.com>
+# Licenced under Academic Free License version 3.0
+# Review w-Open-PS2-Loader README & LICENSE files for further details.
+#
+
+cmake_minimum_required(VERSION 3.5)
+
+if(NOT EXISTS ${PS2SDK}  OR NOT EXISTS ${PS2SDK}/ps2dev.cmake)
+    message(FATAL_ERROR "PS2SDK or Cmake is not setup. Please setup PS2SDK before building this project")
+endif()
+
+set(WOPL_MAJOR_VERSION 0)
+set(WOPL_MINOR_VERSION 0)
+set(WOPL_PATCHLEVEL 0)
+set(WOPL_EXTRAVERSION "WIP")
 
 # How to DEBUG?
-# Simply type "make <debug mode>" to build OPL with the necessary debugging functionality.
+# Simply type "cmake -S . -D<debug mode>=ON" to build wOPL with the necessary debugging functionality.
 # Debug modes:
-#	debug		    	 -	UI-side debug mode (UDPTTY)
-#	iopcore_debug		 -	UI-side + iopcore debug mode (UDPTTY).
-#	ingame_debug		 -	UI-side + in-game debug mode. IOP core modules will not be built as debug versions (UDPTTY).
-#	debug_ppctty		 -	UI-side debug mode (PowerPC UART)
+#	DEBUG		    	 -	UI-side debug mode (UDPTTY)
+#	IOPCORE_DEBUG		 -	UI-side + iopcore debug mode (UDPTTY).
+#	INGAME_DEBUG		 -	UI-side + in-game debug mode. IOP core modules will not be built as debug versions (UDPTTY).
+#	PPCTTY		         -	UI-side debug mode (PowerPC UART) Requires debug mode enabled.
 #	iopcore_ppctty_debug -	UI-side + iopcore debug mode (PowerPC UART).
 #	ingame_ppctty_debug	 -	UI-side + in-game debug mode. IOP core modules will not be built as debug versions (PowerPC UART).
 #	eesio_debug			 -	UI-side + eecore debug mode (EE SIO)
-#	deci2_debug			 -	UI-side + in-game DECI2 debug mode (EE-side only).
+#	DECI2_DEBUG			 -	UI-side + in-game DECI2 debug mode (EE-side only).
 
 # I want to put my name in my custom build! How can I do it?
 # Type "make LOCALVERSION=-foobar"
@@ -24,858 +36,335 @@ EXTRAVERSION = unofficial
 # Do not COMMENT out the variables!!
 # You can also specify variables when executing make: "make RTL=1 IGS=1 PADEMU=1"
 
-# Check if EXTRA_FEATURES is set, default to 0
-EXTRA_FEATURES ?= 0
+option(EXTRA_FEATURES "Check if EXTRA_FEATURES is set, default to OFF" OFF)
 
 # Set RTL and IGS based on EXTRA_FEATURES, but allow user overrides
-#Enables/disables Right-To-Left (RTL) language support
-RTL ?= $(EXTRA_FEATURES)
-#Enables/disables In Game Screenshot (IGS). NB: It depends on GSM and IGR to work
-IGS ?= $(EXTRA_FEATURES)
+if(EXTRA_FEATURES)
+    option(RTL "Enables/disables Right-To-Left (RTL) language support" ON)
+    option(IGS "Enables/disables In Game Screenshot (IGS). NB: It depends on GSM and IGR to work" ON)
+    message(STATUS "EXTRA_FEATURES: Activated")
+else()
+    set(RTL OFF CACHE BOOL "Enable Right-To-Left (RTL) language support" FORCE)
+    set(IGS OFF CACHE BOOL "Enable In Game Screenshot (IGS). NB: Depends on GSM and IGR" FORCE)
+    message(STATUS "EXTRA_FEATURES: Deactivated")
+endif()
 
-#Enables/disables pad emulator
-PADEMU ?= 1
+option(PADEMU "Enables/disables pad emulator" ON)
 
-UDPBD ?= 0
+option(DTL_T10000 "Enables/disables building of an edition of wOPL that will support the DTL-T10000 (SDK v2.3+)" OFF)
 
-#Enables/disables building of an edition of OPL that will support the DTL-T10000 (SDK v2.3+)
-DTL_T10000 ?= 0
+option(NOT_PACKED "Nor stripping neither compressing binary ELF after compiling." OFF)
 
-#Nor stripping neither compressing binary ELF after compiling.
-NOT_PACKED ?= 0
+set(PC_TOOLS "WIN32" CACHE STRING "Enable pc tool building. Choose between: WIN32 or UNIX")
+set_property(CACHE TTY_APPROACH PROPERTY STRINGS "WIN32" "UNIX")
 
 # ======== END OF CONFIGURABLE SECTION. DO NOT MODIFY VARIABLES AFTER THIS POINT!! ========
-DEBUG ?= 0
-EESIO_DEBUG ?= 0
-INGAME_DEBUG ?= 0
-DECI2_DEBUG ?= 0
-#How the TTY will reach developer: 'UDP', 'PPC_UART'.
-TTY_APPROACH ?= UDP
+option(DEBUG "Enable debug build" OFF)
+if(DEBUG)
+    option(EESIO_DEBUG "Enable EE sio debug build" OFF)
+    option(INGAME_DEBUG "Enable in game debug build" OFF)
+    option(DECI2_DEBUG "Enbale DECI2 debug build" OFF)
+    if(NOT DECI2_DEBUG)
+        set(TTY_APPROACH "UDP" CACHE STRING "Enable TTY approach. Choose between: UDP or PPC_UART")
+        set_property(CACHE TTY_APPROACH PROPERTY STRINGS "UDP" "PPC_UART")
+    endif()
+    option(IOPCORE_DEBUG "Enbale IOPCORE debug build" OFF)
+endif()
 
 # ======== DO NOT MODIFY VALUES AFTER THIS POINT! UNLESS YOU KNOW WHAT YOU ARE DOING ========
-REVISION = $(shell expr $(shell git rev-list --count HEAD) + 2)
+set(PROJECT_VERSION_STRING "${WOPL_MAJOR_VERSION}.${WOPL_MINOR_VERSION}.${WOPL_PATCHLEVEL}")
+if (WOPL_EXTRAVERSION)
+    set(PROJECT_VERSION_STRING "${PROJECT_VERSION_STRING}-${WOPL_EXTRAVERSION}")
+endif()
 
-GIT_HASH = $(shell git rev-parse --short=7 HEAD 2>/dev/null)
-ifeq ($(shell git diff --quiet; echo $$?),1)
-  DIRTY = -dirty
-endif
-ifneq ($(shell test -d .git; echo $$?),0)
-  DIRTY = -dirty
-endif
+project(w-Open-PS2-Loader
+    LANGUAGES C ASM
+    VERSION ${WOPL_MAJOR_VERSION}.${WOPL_MINOR_VERSION}.${WOPL_PATCHLEVEL}
+)
 
-GIT_TAG = $(shell git describe --exact-match --tags 2>/dev/null)
-OPL_VERSION = v$(VERSION).$(SUBVERSION).$(PATCHLEVEL)$(if $(EXTRAVERSION),-$(EXTRAVERSION))$(if $(GIT_HASH),-$(GIT_HASH))$(if $(DIRTY),$(DIRTY))$(if $(LOCALVERSION),-$(LOCALVERSION))
+execute_process(COMMAND git rev-list --count HEAD
+                OUTPUT_VARIABLE COMMIT_COUNTS
+                OUTPUT_STRIP_TRAILING_WHITESPACE
+                ERROR_QUIET)
+math(EXPR REVISION "${COMMIT_COUNTS} - 2195" OUTPUT_FORMAT DECIMAL)
 
-ifneq ($(GIT_TAG),)
-ifneq ($(GIT_TAG),latest)
-	# git revision is tagged
-	OPL_VERSION = $(GIT_TAG)$(if $(DIRTY),$(DIRTY))
-endif
-endif
+execute_process(COMMAND git rev-parse --short=7 HEAD
+                OUTPUT_VARIABLE GIT_HASH
+                OUTPUT_STRIP_TRAILING_WHITESPACE
+                ERROR_QUIET)
 
-FRONTEND_OBJS = pad.o xparam.o fntsys.o renderman.o menusys.o OSDHistory.o system.o lang.o lang_internal.o config.o hdd.o dialogs.o \
-		dia.o ioman.o texcache.o themes.o supportbase.o bdmsupport.o ethsupport.o hddsupport.o zso.o lz4.o \
-		appsupport.o favsupport.o gui.o guigame.o textures.o opl.o atlas.o nbns.o httpclient.o gsm.o cheatman.o sound.o ps2cnf.o
+execute_process(COMMAND git diff --quiet
+                RESULT_VARIABLE DIRTY_VARIABLE)
+                
+if(DIRTY_VARIABLE EQUAL 1)
+    set(DIRTY "-dirty")
+else()
+    set(DIRTY "")
+endif()
 
-IOP_OBJS =	iomanx.o filexio.o ps2fs.o usbd.o bdmevent.o \
-		bdm.o bdmfs_fatfs.o usbmass_bd.o usbmass_bd_single.o iLinkman.o IEEE1394_bd.o mx4sio_bd.o \
-		ps2atad.o hdpro_atad.o poweroff.o ps2hdd.o xhdd.o genvmc.o lwnbdsvr.o \
-		ps2dev9.o smsutils.o ps2ip.o smap.o isofs.o nbns-iop.o \
-		sio2man.o padman.o mcman.o mcserv.o \
-		httpclient-iop.o netman.o ps2ips.o \
-		bdm_mcemu.o hdd_mcemu.o smb_mcemu.o \
-		iremsndpatch.o apemodpatch.o f2techioppatch.o cleareffects.o resetspu.o patch_membo.o\
-		libsd.o audsrv.o
+if(NOT EXISTS "${CMAKE_SOURCE_DIR}/.git")
+    set(DIRTY "-dirty")
+endif()
 
-EECORE_OBJS = ee_core.o ioprp.o util.o \
-		udnl.o imgdrv.o eesync.o \
-		bdm_cdvdman.o bdm_ata_cdvdman.o IOPRP_img.o smb_cdvdman.o \
-		hdd_cdvdman.o hdd_hdpro_cdvdman.o cdvdfsv.o \
-		ingame_smstcpip.o smap_ingame.o smbman.o smbinit.o
+execute_process(COMMAND git describe --exact-match --tags
+                OUTPUT_VARIABLE GIT_TAG
+                OUTPUT_STRIP_TRAILING_WHITESPACE
+                ERROR_QUIET)
 
-PNG_ASSETS = load0 load1 load2 load3 load4 load5 load6 load7 usb usb_bd ilk_bd \
-	m4s_bd hdd_bd hdd eth app fav fav_mark cross triangle circle square select start left right \
-	settings_bg info cover disc screen ELF HDL ISO ZSO UL APPS CD DVD Aspect_s Aspect_w Aspect_w1 \
-	Aspect_w2 Device_1 Device_2 Device_3 Device_4 Device_5 Device_6 Device_all Rating_0 \
-	Rating_1 Rating_2 Rating_3 Rating_4 Rating_5 Scan_240p Scan_240p1 Scan_480i Scan_480p \
-	Scan_480p1 Scan_480p2 Scan_480p3 Scan_480p4 Scan_480p5 Scan_576i Scan_576p Scan_720p \
-	Scan_1080i Scan_1080i2 Scan_1080p Vmode_multi Vmode_ntsc Vmode_pal logo case apps_case \
-	plank lm_case lm_apps_case lm_case_shadow \
-	Index_0 Index_1 Index_2 Index_3 Index_4 R3 up down
-	# unused icons - l1 l2 l3 r1 r2
+set(WOPL_VERSION "${PROJECT_VERSION_STRING}")
 
-GFX_OBJS = $(PNG_ASSETS:%=%_png.o) poeveticanew.o icon_sys.o icon_icn.o icon_cpy_icn.o icon_del_icn.o
+if(REVISION)
+    string(APPEND WOPL_VERSION "-${REVISION}")
+endif()
+if(GIT_HASH)
+    string(APPEND WOPL_VERSION "-${GIT_HASH}")
+endif()
+if(DIRTY)
+    string(APPEND WOPL_VERSION "${DIRTY}")
+endif()
+if(LOCALVERSION)
+    string(APPEND WOPL_VERSION "-${LOCALVERSION}")
+endif()
 
-AUDIO_OBJS =	boot.o cancel.o confirm.o cursor.o message.o transition.o bd_connect.o bd_disconnect.o
+if(GIT_TAG AND NOT GIT_TAG STREQUAL "latest")
+    set(WOPL_VERSION "${GIT_TAG}${DIRTY}")
+endif()
 
-MISC_OBJS =	icon_sys_A.o icon_sys_J.o icon_sys_C.o conf_theme_OPL.o conf_theme_OPL_CF.o
-
-TRANSLATIONS = Albanian Arabic Bulgarian Cebuano Croatian Czech Danish Dutch Filipino French \
-	German Greek Hungarian Indonesian Italian Japanese Korean Laotian Persian Polish Portuguese \
-	Portuguese_BR Romana Russian Ryukyuan SChinese Spanish Swedish TChinese Turkish Vietnamese
-
-EE_BIN = opl.elf
-EE_BIN_STRIPPED = opl_stripped.elf
-EE_BIN_PACKED = OPNPS2LD.ELF
-EE_VPKD = OPNPS2LD-$(OPL_VERSION)
-EE_SRC_DIR = src/
-EE_OBJS_DIR = obj/
-EE_ASM_DIR = asm/
-LNG_SRC_DIR = lng_src/
-LNG_TMPL_DIR = lng_tmpl/
-LNG_DIR = lng/
-PNG_ASSETS_DIR = gfx/
-
-MAPFILE = opl.map
-EE_LDFLAGS += -Wl,-Map,$(MAPFILE)
-
-EE_LIBS = -L$(PS2SDK)/ports/lib -L$(GSKIT)/lib -L./lib -lgskit -ldmakit -lpoweroff -lfileXio -lpatches -lpng -lz -lmc -lfreetype -lvux -lcdvd -lnetman -lps2ips -laudsrv -lvorbisfile -lvorbis -logg -lpadx -lelf-loader-nocolour
-EE_INCS += -I$(PS2SDK)/ports/include -I$(PS2SDK)/ports/include/freetype2 -I$(GSKIT)/include -I$(GSKIT)/ee/dma/include -I$(GSKIT)/ee/gs/include -Imodules/iopcore/common -Imodules/network/common -Imodules/hdd/common -Iinclude
-BIN2C = $(PS2SDK)/bin/bin2c
+message(STATUS "WOPL_VERSION: ${WOPL_VERSION}")
 
 # WARNING: Only extra spaces are allowed and ignored at the beginning of the conditional directives (ifeq, ifneq, ifdef, ifndef, else and endif)
 # but a tab is not allowed; if the line begins with a tab, it will be considered part of a recipe for a rule!
 
-ifeq ($(RTL),1)
-  EE_CFLAGS += -D__RTL
-endif
+if(RTL)
+  set(RTL_CFLAGS -D__RTL)
+endif()
 
-ifeq ($(DTL_T10000),1)
-  EE_CFLAGS += -D_DTL_T10000
-  EECORE_EXTRA_FLAGS += DTL_T10000=1
-  UDNL_OUT = $(PS2SDK)/iop/irx/udnl-t300.irx
-else
-  UDNL_OUT = $(PS2SDK)/iop/irx/udnl.irx
-endif
+if(DTL_T10000)
+  set(DTL_CFLAGS -D_DTL_T10000)
+  set(UDNL_OUT $(PS2SDK)/iop/irx/udnl-t300.irx)
+else()
+  set(UDNL_OUT $(PS2SDK)/iop/irx/udnl.irx)
+endif()
 
-ifeq ($(IGS),1)
-  EE_CFLAGS += -DIGS
-  IGS_FLAGS = IGS=1
-else
-  IGS_FLAGS = IGS=0
-endif
+if(IGS)
+  set(IGS_CFLAGS -DIGS)
+endif()
 
-ifeq ($(PADEMU),1)
-  IOP_OBJS += bt_pademu.o usb_pademu.o ds34usb.o ds34bt.o libds34usb.a libds34bt.a
-  EE_CFLAGS += -DPADEMU
-  EE_INCS += -Imodules/ds34bt/ee -Imodules/ds34usb/ee
-  PADEMU_FLAGS = PADEMU=1
-else
-  PADEMU_FLAGS = PADEMU=0
-endif
+if(PADEMU)
+  set(PADEMU_OBJS bt_pademu.o usb_pademu.o ds34usb.o ds34bt.o)
+  set(PADEMU_CFLAGS -DPADEMU)
+  set(PADEMU_INCS -Imodules/ds34bt/ee -Imodules/ds34usb/ee)
+  set(PADEMU_LIBS libds34usb.a libds34bt.a)
+endif()
 
-ifeq ($(UDPBD),1)
-  EE_OBJS += smap_udpbd.o bdm_udp_cdvdman.o
-  PNG_ASSETS += udp_bd
-  EE_CFLAGS += -DUDPBD
-  UDPBD_FLAGS = UDPBD=1
-else
-  UDPBD_FLAGS = UDPBD=0
-endif
+if(DEBUG)
+  set(APPEND DEBUG_CFLAGS "-D__DEBUG" -g)
+  set(DEBUG_OBJS "")
+  set(DEBUG_LDFLAGS "")
+  set(SMSTCPIP_INGAME_CFLAGS "")
+  set(DEBUG_LIBS "")
+  if (DECI2_DEBUG)
+    list(APPEND DEBUG_OBJS debug.o drvtif_irx.o tifinet_irx.o deci2_img.o)
+    list(APPEND DEBUG_LIBS iopreboot)
+  elseif (TTY_APPROACH STREQUAL "UDP")
+    list(APPEND DEBUG_OBJS debug.o udptty.o ioptrap.o ps2link.o)
+    list(APPEND DEBUG_CFLAGS "-DTTY_UDP")
+  elseif (TTY_APPROACH STREQUAL "PPC_UART") 
+    list(APPEND DEBUG_OBJS debug.o ppctty.o ioptrap.o)
+    list(APPEND DEBUG_CFLAGS "-DTTY_PPC_UART")
+  else()
+    message(FATAL_ERROR "Unknown value for TTY_APPROACH: ${TTY_APPROACH}
+      choose UDP or PPC_UART approaches.")
+  endif()
+  set(MOD_DEBUG_FLAGS DEBUG=1)
+  if (IOPCORE_DEBUG)
+    list(APPEND DEBUG_CFLAGS "-D__INGAME_DEBUG")
+    list(APPEND EECORE_EXTRA_FLAGS LOAD_DEBUG_MODULES=1)
+    lisr(APPEND SMSTCPIP_INGAME_CFLAGS "") 
+    if (TTY_APPROACH STREQUAL "UDP")
+      list(APPEND DEBUG_OBJS udptty-ingame.o)
+    endif()
+  elseif(EESIO_DEBUG)
+    list(APPEND DEBUG_CFLAGS "-D__EESIO_DEBUG")
+    list(APPEND DEBUG_LIBS siocookie)
+  elseif (INGAME_DEBUG)
+    list(APPEND DEBUG_CFLAGS "-D__INGAME_DEBUG")
+    list(APPEND EECORE_EXTRA_FLAGS LOAD_DEBUG_MODULES=1)
+    list(APPEND CDVDMAN_DEBUG_FLAGS IOPCORE_DEBUG=1)
+    list(APPEND SMSTCPIP_INGAME_CFLAGS "")
+    if(DECI2_DEBUG)
+      list(APPEND DEBUG_CFLAGS "-D__DECI2_DEBUG")
+      list(APPEND EECORE_EXTRA_FLAGS += DECI2_DEBUG=1)
+      list(APPEND DEBUG_OBJS drvtif_ingame_irx.o tifinet_ingame_irx.o)
+      list(APPEND DECI2_DEBUG=1)
+      list(APPEND CDVDMAN_DEBUG_FLAGS USE_DEV9=1) #(clear IOPCORE_DEBUG) dsidb cannot be used to handle exceptions or set breakpoints, so disable output to save resources.
+    elseif(TTY_APPROACH STREQUAL "UDP")
+      list(APPEND DEBUG_OBJS udptty-ingame.o)
+      list(APPEND EECORE_EXTRA_FLAGS "TTY_APPROACH=${TTY_APPROACH}")
+    elseif(TTY_APPROACH STREQUAL "PPC_UART")
+      list(APPEND EECORE_EXTRA_FLAGS "TTY_APPROACH=${TTY_APPROACH}")
+    endif()
+  endif()
+else()
+  set(EE_CFLAGS -O2)
+  set(SMSTCPIP_INGAME_CFLAGS INGAME_DRIVER=1)
+endif()
 
-ifeq ($(DEBUG),1)
-  EE_CFLAGS += -D__DEBUG -g
-  ifeq ($(DECI2_DEBUG),1)
-    EE_OBJS += debug.o drvtif_irx.o tifinet_irx.o deci2_img.o
-    EE_LDFLAGS += -liopreboot
-  else ifeq ($(TTY_APPROACH),UDP)
-    EE_OBJS += debug.o udptty.o ioptrap.o ps2link.o
-    EE_CFLAGS += -DTTY_UDP
-  else ifeq ($(TTY_APPROACH),PPC_UART)
-    EE_OBJS += debug.o ppctty.o ioptrap.o
-    EE_CFLAGS += -DTTY_PPC_UART
-  else
-	$(error Unknown value for TTY_APPROACH: '$(TTY_APPROACH)')
-  endif
-  MOD_DEBUG_FLAGS = DEBUG=1
-  ifeq ($(IOPCORE_DEBUG),1)
-    EE_CFLAGS += -D__INGAME_DEBUG
-    EECORE_EXTRA_FLAGS += LOAD_DEBUG_MODULES=1
-    CDVDMAN_DEBUG_FLAGS = IOPCORE_DEBUG=1
-    MCEMU_DEBUG_FLAGS = IOPCORE_DEBUG=1
-    SMSTCPIP_INGAME_CFLAGS =
-    ifeq ($(TTY_APPROACH),UDP)
-      IOP_OBJS += udptty-ingame.o
-    endif
-  else ifeq ($(EESIO_DEBUG),1)
-    EE_CFLAGS += -D__EESIO_DEBUG
-    EE_LIBS += -lsiocookie
-  else ifeq ($(INGAME_DEBUG),1)
-    EE_CFLAGS += -D__INGAME_DEBUG
-    EECORE_EXTRA_FLAGS += LOAD_DEBUG_MODULES=1
-    CDVDMAN_DEBUG_FLAGS = IOPCORE_DEBUG=1
-    SMSTCPIP_INGAME_CFLAGS =
-    ifeq ($(DECI2_DEBUG),1)
-      EE_CFLAGS += -D__DECI2_DEBUG
-      EECORE_EXTRA_FLAGS += DECI2_DEBUG=1
-      IOP_OBJS += drvtif_ingame_irx.o tifinet_ingame_irx.o
-      DECI2_DEBUG=1
-      CDVDMAN_DEBUG_FLAGS = USE_DEV9=1 #(clear IOPCORE_DEBUG) dsidb cannot be used to handle exceptions or set breakpoints, so disable output to save resources.
-    else ifeq ($(TTY_APPROACH),UDP)
-      IOP_OBJS += udptty-ingame.o
-      EECORE_EXTRA_FLAGS += "TTY_APPROACH=$(TTY_APPROACH)"
-    else ifeq ($(TTY_APPROACH),PPC_UART)
-      EECORE_EXTRA_FLAGS += "TTY_APPROACH=$(TTY_APPROACH)"
-    endif
-  endif
-else
-  EE_CFLAGS += -O2
-  SMSTCPIP_INGAME_CFLAGS = INGAME_DRIVER=1
-endif
+set(FRONTEND_OBJS src/appsupport.c src/atlas.c src/bdmsupport.c src/cheatman.c src/debug.c src/dia.c src/dialogs.c src/ethsupport.c src/fntsys.c src/gsm.c src/gui.c src/guigame.c src/hdd.c
+src/hddsupport.c src/httpclient.c src/ioman.c src/ioprp.c src/lang_internal.c src/lang.c src/lz4.c src/menusys.c src/nbns.c src/opl.c src/OSDHistory.c src/pad.c src/ps2cnf.c src/renderman.c
+src/system.c src/texcache.c src/textures.c src/themes.c src/util.c src/xparam.c src/zso.c)
 
-EE_CFLAGS += -fsingle-precision-constant -DOPL_VERSION=\"$(OPL_VERSION)\"
+set(IOP_OBJS iomanx.o filexio.o ps2fs.o usbd.o bdmevent.o 
+		bdm.o bdmfs_fatfs.o usbmass_bd.o iLinkman.o IEEE1394_bd.o mx4sio_bd.o 
+		ps2atad.o hdpro_atad.o poweroff.o ps2hdd.o xhdd.o genvmc.o lwnbdsvr.o 
+		ps2dev9.o smsutils.o ps2ip.o smap.o isofs.o nbns-iop.o 
+		sio2man.o padman.o mcman.o mcserv.o 
+		httpclient-iop.o netman.o ps2ips.o 
+		bdm_mcemu.o hdd_mcemu.o smb_mcemu.o 
+		iremsndpatch.o apemodpatch.o f2techioppatch.o cleareffects.o resetspu.o 
+		libsd.o audsrv.o)
+
+set(EECORE_OBJS = ee_core.o ioprp.o util.o 
+	udnl.o imgdrv.o eesync.o 
+	bdm_cdvdman.o bdm_ata_cdvdman.o IOPRP_img.o smb_cdvdman.o 
+	hdd_cdvdman.o hdd_hdpro_cdvdman.o cdvdfsv.o 
+	ingame_smstcpip.o smap_ingame.o smbman.o smbinit.o)
+
+set(PNG_ASSETS load0 load1 load2 load3 load4 load5 load6 load7 usb usb_bd ilk_bd 
+	m4s_bd hdd_bd hdd eth app cross triangle circle square select start left right 
+	background info cover disc screen ELF HDL ISO ZSO UL APPS CD DVD Aspect_s Aspect_w Aspect_w1 
+	Aspect_w2 Device_1 Device_2 Device_3 Device_4 Device_5 Device_6 Device_all Rating_0 
+	Rating_1 Rating_2 Rating_3 Rating_4 Rating_5 Scan_240p Scan_240p1 Scan_480i Scan_480p 
+	Scan_480p1 Scan_480p2 Scan_480p3 Scan_480p4 Scan_480p5 Scan_576i Scan_576p Scan_720p 
+	Scan_1080i Scan_1080i2 Scan_1080p Vmode_multi Vmode_ntsc Vmode_pal logo case apps_case
+	Index_0 Index_1 Index_2 Index_3 Index_4)
+	# unused icons - up down l1 l2 l3 r1 r2 r3
+
+set(GFX_OBJS $(PNG_ASSETS:%=%_png.o) poeveticanew.o icon_sys.o icon_icn.o)
+
+set(AUDIO_OBJS bd_connect.o bd_disconnect.o boot.o cancel.o confirm.o cursor.o message.o transition.o)
+
+set(MISC_OBJS conf_theme_wOPL.o icon_sys_A.o icon_sys_C.o icon_sys_J.o)
+
+set(TRANSLATIONS Albanian Arabic Bulgarian Cebuano Croatian Czech Danish Dutch Filipino French 
+	German Greek Hungarian Indonesian Italian Japanese Korean Laotian Persian Polish Portuguese 
+	Portuguese_BR Romana Russian Ryukyuan SChinese Spanish Swedish TChinese Turkish Vietnamese)
+
+#########################################################################
+
+set(EE_BIN wopl.elf)
+set(EE_BIN_STRIPPED wopl_stripped.elf)
+set(EE_BIN_PACKED WOPNPS2LD.ELF)
+set(EE_VPKD WOPNPS2LD-${WOPL_VERSION})
+set(EE_VPKD_ZIP ${EE_VPKD}.zip)
+set(EE_SRC_DIR src/)
+set(EE_OBJS_DIR "obj/")
+set(EE_ASM_DIR = "asm/")
+set(LNG_SRC_DIR lng_src/)
+set(LNG_TMPL_DIR lng_tmpl/)
+set(LNG_DIR lng/)
+set(PNG_ASSETS_DIR gfx/)
+
+set(MAPFILE wopl.map)
+list(APPEND EE_LDFLAGS "-Wl,-Map,{MAPFILE}")
+
+find_package(ZLIB)
+find_package(Ogg)
+find_package(Vorbis)
+find_package(PNG)
+find_package(Freetype)
+
+execute_process(COMMAND ./make_changelog.sh)
+
+add_executable(wopl.elf ${FRONTEND_OBJS})
+add_custom_target(stripped 
+  COMMENT "Stripping..."
+  COMMAND ${EE_STRIP} -o ${EE_BIN_STRIPPED} ${EE_BIN}
+  DEPENDS wopl.elf)
+
+add_custom_target(packed 
+  COMMENT "Compressing..."
+  COMMAND ps2-packer ${EE_BIN_STRIPPED} ${EE_BIN_PACKED} > /dev/null
+  DEPENDS stripped)
+
+add_custom_target(VPKD
+  COMMAND cp -f ${EE_BIN_PACKED} ${EE_VPKD}
+  DEPENDS packed)
+
+add_custom_target(
+  VPKD_ZIP ALL
+  COMMENT "Creating ZIP package: ${EE_VPKD_ZIP}..."  
+  COMMAND zip -r ${EE_VPKD_ZIP} ${EE_BIN_PACKED} DETAILED_CHANGELOG CREDITS LICENSE README.md
+  COMMAND echo "Package complete: ${EE_VPKD_ZIP}"
+  DEPENDS VPKD
+  VERBATIM )
+
+target_link_libraries(wopl.elf PRIVATE $(DEBUG_LIBS) gskit dmakit poweroff fileXio patches mc vux cdvd netman ps2ips audsrv padx elf-loader-nocolour)
+
+list(APPEND EE_CFLAGS -fsingle-precision-constant "-DWOPL_VERSION=\"${WOPL_VERSION}\"")
 
 # There are a few places where the config key/value are truncated, so disable these warnings
-EE_CFLAGS += -Wno-format-truncation -Wno-stringop-truncation
+list(APPEND EE_CFLAGS += -Wno-format-truncation -Wno-stringop-truncation)
 # Generate .d files to track header file dependencies of each object file
-EE_CFLAGS += -MMD -MP
-EE_OBJS += $(FRONTEND_OBJS) $(GFX_OBJS) $(AUDIO_OBJS) $(MISC_OBJS) $(EECORE_OBJS) $(IOP_OBJS)
-EE_OBJS := $(EE_OBJS:%=$(EE_OBJS_DIR)%)
-EE_DEPS = $($(filter %.o,$(EE_OBJS)):%.o=%.d)
+list(APPEND EE_CFLAGS += -MMD -MP)
+
+list(TRANSFORM EE_OBJS PREPEND ${EE_OBJS_DIR})
+
+foreach(obj ${EE_OBJS})
+    list(APPEND PREPENDED_EE_OBJS "${EE_OBJS_DIR}${obj}")
+endforeach()
+set(EE_OBJS ${PREPENDED_EE_OBJS})
+
+set(EE_DEPS)
+foreach(obj ${EE_OBJS})
+    string(REGEX REPLACE "\\.o$" ".d" dep_file ${obj})
+    list(APPEND EE_DEPS ${dep_file})
+endforeach()
+
+list(APPEND EE_OBJS 
+    ${FRONTEND_OBJS} 
+    ${GFX_OBJS} 
+    ${AUDIO_OBJS} 
+    ${MISC_OBJS} 
+    ${EECORE_OBJS} 
+    ${IOP_OBJS}
+)
 
 # To help linking getting rid off unused functions and data
-EE_CFLAGS += -fdata-sections -ffunction-sections
-EE_LDFLAGS += -fdata-sections -ffunction-sections -Wl,--gc-sections
-
-.SILENT:
-
-.PHONY: all release debug iopcore_debug eesio_debug ingame_debug deci2_debug debug_ppctty iopcore_ppctty_debug ingame_ppctty_debug clean rebuild pc_tools pc_tools_win32 oplversion format format-check ps2sdk-not-setup download_lng download_lwNBD languages
-
-ifdef PS2SDK
-
-all: download_lng download_lwNBD languages
-	echo "Building Open PS2 Loader $(OPL_VERSION)..."
-	echo "-Interface"
-ifneq ($(NOT_PACKED),1)
-	$(MAKE) $(EE_BIN_PACKED)
-else
-	$(MAKE) $(EE_BIN)
-endif
-
-release: download_lng download_lwNBD languages $(EE_VPKD).ZIP
-
-debug:
-	$(MAKE) DEBUG=1 all
-
-iopcore_debug:
-	$(MAKE) DEBUG=1 IOPCORE_DEBUG=1 all
-
-eesio_debug:
-	$(MAKE) DEBUG=1 EESIO_DEBUG=1 all
-
-ingame_debug:
-	$(MAKE) DEBUG=1 INGAME_DEBUG=1 all
-
-deci2_debug:
-	$(MAKE) DEBUG=1 INGAME_DEBUG=1 DECI2_DEBUG=1 all
-
-debug_ppctty:
-	$(MAKE) DEBUG=1 TTY_APPROACH=PPC_UART all
-
-iopcore_ppctty_debug:
-	$(MAKE) DEBUG=1 IOPCORE_DEBUG=1 TTY_APPROACH=PPC_UART all
-
-ingame_ppctty_debug:
-	$(MAKE) DEBUG=1 INGAME_DEBUG=1 TTY_APPROACH=PPC_UART all
-
-clean:	download_lwNBD
-	echo "Cleaning..."
-	echo "-Interface"
-	rm -fr $(MAPFILE) $(EE_BIN) $(EE_BIN_PACKED) $(EE_BIN_STRIPPED) $(EE_VPKD).* $(EE_OBJS_DIR) $(EE_ASM_DIR)
-	echo "-EE core"
-	$(MAKE) -C ee_core clean
-	echo "-IOP core"
-	echo " -imgdrv"
-	$(MAKE) -C modules/iopcore/imgdrv clean
-	echo " -cdvdman"
-	$(MAKE) -C modules/iopcore/cdvdman USE_BDM=1 clean
-	$(MAKE) -C modules/iopcore/cdvdman USE_BDM_ATA=1 clean
-	$(MAKE) -C modules/iopcore/cdvdman USE_SMB=1 clean
-	$(MAKE) -C modules/iopcore/cdvdman USE_UDPBD=1 clean
-	$(MAKE) -C modules/iopcore/cdvdman USE_HDD=1 clean
-	$(MAKE) -C modules/iopcore/cdvdman USE_HDPRO=1 clean
-	echo " -cdvdfsv"
-	$(MAKE) -C modules/iopcore/cdvdfsv clean
-	echo " -resetspu"
-	$(MAKE) -C modules/iopcore/resetspu clean
-	echo "  -patches"
-	echo "   -iremsnd"
-	$(MAKE) -C modules/iopcore/patches/iremsndpatch clean
-	echo "   -apemod"
-	$(MAKE) -C modules/iopcore/patches/apemodpatch clean
-	echo "   -f2techiop"
-	$(MAKE) -C modules/iopcore/patches/f2techioppatch clean
-	echo "   -cleareffects"
-	$(MAKE) -C modules/iopcore/patches/cleareffects clean
-	echo " -patch_membo"
-	$(MAKE) -C modules/iopcore/patch_membo clean
-	echo " -isofs"
-	$(MAKE) -C modules/isofs clean
-	echo " -bdmevent"
-	$(MAKE) -C modules/bdmevent clean
-	echo " -SMSUTILS"
-	$(MAKE) -C modules/network/SMSUTILS clean
-	echo " -SMSTCPIP"
-	$(MAKE) -C modules/network/SMSTCPIP clean
-	echo " -in-game SMAP"
-	$(MAKE) -C modules/network/smap-ingame clean
-	echo " -UDPBD SMAP"
-	$(MAKE) -C modules/smap_udpbd/ clean
-	echo " -smbinit"
-	$(MAKE) -C modules/network/smbinit clean
-	echo " -nbns"
-	$(MAKE) -C modules/network/nbns clean
-	echo " -httpclient"
-	$(MAKE) -C modules/network/httpclient clean
-	echo " -xhdd"
-	$(MAKE) -C modules/hdd/xhdd clean
-	echo " -mcemu"
-	$(MAKE) -C modules/mcemu USE_BDM=1 clean
-	$(MAKE) -C modules/mcemu USE_HDD=1 clean
-	$(MAKE) -C modules/mcemu USE_SMB=1 clean
-	echo " -genvmc"
-	$(MAKE) -C modules/vmc/genvmc clean
-	echo " -lwnbdsvr"
-	$(MAKE) -C modules/network/lwNBD/ TARGET=iop clean
-	echo " -udptty-ingame"
-	$(MAKE) -C modules/debug/udptty-ingame clean
-	echo " -ps2link"
-	$(MAKE) -C modules/debug/ps2link clean
-	echo " -ds34usb"
-	$(MAKE) -C modules/ds34usb clean
-	echo " -ds34bt"
-	$(MAKE) -C modules/ds34bt clean
-	echo " -pademu"
-	$(MAKE) -C modules/pademu USE_BT=1 clean
-	$(MAKE) -C modules/pademu USE_USB=1 clean
-	echo "-pc tools"
-	$(MAKE) -C pc clean
-
-realclean: clean
-	echo "-Language"
-	rm -fr $(LNG_SRC_DIR) $(LNG_DIR)lang_*.lng $(INTERNAL_LANGUAGE_C) $(INTERNAL_LANGUAGE_H)
-
-rebuild: clean all
-
-run: $(EE_BIN_PACKED)
-	ps2client -h 192.168.1.10 execee host:$<
-
-sim: $(EE_BIN_PACKED)
-	PCSX2 --elf=$(PWD)/$< --nodisc --nogui
-
-pc_tools:
-	echo "Building iso2opl, opl2iso and genvmc..."
-	$(MAKE) _WIN32=0 -C pc
-
-pc_tools_win32:
-	echo "Building WIN32 iso2opl, opl2iso and genvmc..."
-	$(MAKE) _WIN32=1 -C pc
-
-cfla = "thirdparty/clang-format-lint-action"
-format-check: download_cfla
-	@python3 $(cfla)/run-clang-format.py --clang-format-executable $(cfla)/clang-format/clang-format12 -r .
-
-format: download_cfla
-	@python3 $(cfla)/run-clang-format.py --clang-format-executable $(cfla)/clang-format/clang-format12 -r . -i true
-
-$(EE_ASM_DIR):
-	@mkdir -p $@
-
-$(EE_OBJS_DIR):
-	@mkdir -p $@
-
-.PHONY: DETAILED_CHANGELOG
-DETAILED_CHANGELOG:
-	sh make_changelog.sh
-
-$(EE_BIN_STRIPPED): $(EE_BIN)
-	echo "Stripping..."
-	$(EE_STRIP) -o $@ $<
-
-$(EE_BIN_PACKED): $(EE_BIN_STRIPPED)
-	echo "Compressing..."
-	ps2-packer $< $@ > /dev/null
-
-$(EE_VPKD).ELF: $(EE_BIN_PACKED)
-	cp -f $< $@
-
-$(EE_VPKD).ZIP: $(EE_VPKD).ELF DETAILED_CHANGELOG CREDITS LICENSE README.md
-	zip -r $@ $^
-	echo "Package Complete: $@"
-
-ee_core/ee_core.elf: ee_core
-	echo "-EE core"
-	$(MAKE) $(IGS_FLAGS) $(PADEMU_FLAGS) $(EECORE_EXTRA_FLAGS) -C $<
-
-$(EE_ASM_DIR)ee_core.c: ee_core/ee_core.elf | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ eecore_elf
-
-modules/smap_udpbd/smap_udpbd.irx: modules/smap_udpbd/
-	$(MAKE) -C $<
-
-$(EE_ASM_DIR)smap_udpbd.c: modules/smap_udpbd/smap_udpbd.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-$(EE_ASM_DIR)udnl.c: $(UDNL_OUT) | $(EE_ASM_DIR)
-	$(BIN2C) $(UDNL_OUT) $@ udnl_irx
-
-modules/iopcore/imgdrv/imgdrv.irx: modules/iopcore/imgdrv
-	$(MAKE) -C $<
-
-$(EE_ASM_DIR)imgdrv.c: modules/iopcore/imgdrv/imgdrv.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-$(EE_ASM_DIR)eesync.c: $(PS2SDK)/iop/irx/eesync-nano.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-modules/iopcore/cdvdman/bdm_cdvdman.irx: modules/iopcore/cdvdman
-	$(MAKE) $(CDVDMAN_PS2LOGO_FLAGS) $(CDVDMAN_DEBUG_FLAGS) USE_BDM=1 -C $< all
-
-$(EE_ASM_DIR)bdm_cdvdman.c: modules/iopcore/cdvdman/bdm_cdvdman.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-modules/iopcore/cdvdman/bdm_ata_cdvdman.irx: modules/iopcore/cdvdman
-	$(MAKE) $(CDVDMAN_PS2LOGO_FLAGS) $(CDVDMAN_DEBUG_FLAGS) USE_BDM_ATA=1 -C $< all
-
-$(EE_ASM_DIR)bdm_ata_cdvdman.c: modules/iopcore/cdvdman/bdm_ata_cdvdman.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ bdm_ata_cdvdman_irx
-
-modules/iopcore/cdvdman/bdm_udp_cdvdman.irx: modules/iopcore/cdvdman
-	$(MAKE) $(CDVDMAN_PS2LOGO_FLAGS) $(CDVDMAN_DEBUG_FLAGS) USE_UDPBD=1 -C $< all
-
-$(EE_ASM_DIR)bdm_udp_cdvdman.c: modules/iopcore/cdvdman/bdm_udp_cdvdman.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ bdm_udp_cdvdman_irx
-
-modules/iopcore/cdvdman/smb_cdvdman.irx: modules/iopcore/cdvdman
-	$(MAKE) $(CDVDMAN_PS2LOGO_FLAGS) $(CDVDMAN_DEBUG_FLAGS) USE_SMB=1 -C $< all
-
-$(EE_ASM_DIR)smb_cdvdman.c: modules/iopcore/cdvdman/smb_cdvdman.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-modules/iopcore/cdvdman/hdd_cdvdman.irx: modules/iopcore/cdvdman
-	$(MAKE) $(CDVDMAN_PS2LOGO_FLAGS) $(CDVDMAN_DEBUG_FLAGS) USE_HDD=1 -C $< all
-
-$(EE_ASM_DIR)hdd_cdvdman.c: modules/iopcore/cdvdman/hdd_cdvdman.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-modules/iopcore/cdvdman/hdd_hdpro_cdvdman.irx: modules/iopcore/cdvdman
-	$(MAKE) $(CDVDMAN_PS2LOGO_FLAGS) $(CDVDMAN_DEBUG_FLAGS) USE_HDPRO=1 -C $< all
-
-$(EE_ASM_DIR)hdd_hdpro_cdvdman.c: modules/iopcore/cdvdman/hdd_hdpro_cdvdman.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-modules/iopcore/cdvdfsv/cdvdfsv.irx: modules/iopcore/cdvdfsv
-	$(MAKE) -C $<
-
-$(EE_ASM_DIR)cdvdfsv.c: modules/iopcore/cdvdfsv/cdvdfsv.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-modules/iopcore/patches/iremsndpatch/iremsndpatch.irx: modules/iopcore/patches/iremsndpatch
-	$(MAKE) -C $<
-
-$(EE_ASM_DIR)iremsndpatch.c: modules/iopcore/patches/iremsndpatch/iremsndpatch.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-modules/iopcore/patches/apemodpatch/apemodpatch.irx: modules/iopcore/patches/apemodpatch
-	$(MAKE) -C $<
-
-$(EE_ASM_DIR)apemodpatch.c: modules/iopcore/patches/apemodpatch/apemodpatch.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-modules/iopcore/patches/f2techioppatch/f2techioppatch.irx: modules/iopcore/patches/f2techioppatch
-	$(MAKE) -C $<
-
-$(EE_ASM_DIR)f2techioppatch.c: modules/iopcore/patches/f2techioppatch/f2techioppatch.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-modules/iopcore/patches/cleareffects/cleareffects.irx: modules/iopcore/patches/cleareffects
-	$(MAKE) -C $<
-
-$(EE_ASM_DIR)cleareffects.c: modules/iopcore/patches/cleareffects/cleareffects.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-modules/iopcore/resetspu/resetspu.irx: modules/iopcore/resetspu
-	$(MAKE) -C $<
-
-$(EE_ASM_DIR)resetspu.c: modules/iopcore/resetspu/resetspu.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-modules/iopcore/patch_membo/patch_membo.irx: modules/iopcore/patch_membo
-	$(MAKE) -C $<
-
-$(EE_ASM_DIR)patch_membo.c: modules/iopcore/patch_membo/patch_membo.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-modules/mcemu/bdm_mcemu.irx: modules/mcemu
-	$(MAKE) $(MCEMU_DEBUG_FLAGS) $(PADEMU_FLAGS) USE_BDM=1 -C $< all
-
-$(EE_ASM_DIR)bdm_mcemu.c: modules/mcemu/bdm_mcemu.irx
-	$(BIN2C) $< $@ $(*F)_irx
-
-modules/mcemu/hdd_mcemu.irx: modules/mcemu
-	$(MAKE) $(MCEMU_DEBUG_FLAGS) $(PADEMU_FLAGS) USE_HDD=1 -C $< all
-
-$(EE_ASM_DIR)hdd_mcemu.c: modules/mcemu/hdd_mcemu.irx
-	$(BIN2C) $< $@ $(*F)_irx
-
-modules/mcemu/smb_mcemu.irx: modules/mcemu
-	$(MAKE) $(MCEMU_DEBUG_FLAGS) $(PADEMU_FLAGS) USE_SMB=1 -C $< all
-
-$(EE_ASM_DIR)smb_mcemu.c: modules/mcemu/smb_mcemu.irx
-	$(BIN2C) $< $@ $(*F)_irx
-
-modules/isofs/isofs.irx: modules/isofs
-	$(MAKE) -C $<
-
-$(EE_ASM_DIR)isofs.c: modules/isofs/isofs.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-$(EE_ASM_DIR)usbd.c: $(PS2SDK)/iop/irx/usbd_mini.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-$(EE_ASM_DIR)libsd.c: $(PS2SDK)/iop/irx/libsd.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-$(EE_ASM_DIR)audsrv.c: $(PS2SDK)/iop/irx/audsrv.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-$(EE_OBJS_DIR)libds34bt.a: modules/ds34bt/ee/libds34bt.a
-	cp $< $@
-
-modules/ds34bt/ee/libds34bt.a: modules/ds34bt/ee
-	$(MAKE) -C $<
-
-modules/ds34bt/iop/ds34bt.irx: modules/ds34bt/iop
-	$(MAKE) -C $<
-
-$(EE_ASM_DIR)ds34bt.c: modules/ds34bt/iop/ds34bt.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-$(EE_OBJS_DIR)libds34usb.a: modules/ds34usb/ee/libds34usb.a
-	cp $< $@
-
-modules/ds34usb/ee/libds34usb.a: modules/ds34usb/ee
-	$(MAKE) -C $<
-
-modules/ds34usb/iop/ds34usb.irx: modules/ds34usb/iop
-	$(MAKE) -C $<
-
-$(EE_ASM_DIR)ds34usb.c: modules/ds34usb/iop/ds34usb.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-modules/pademu/bt_pademu.irx: modules/pademu
-	$(MAKE) -C $< USE_BT=1
-
-$(EE_ASM_DIR)bt_pademu.c: modules/pademu/bt_pademu.irx
-	$(BIN2C) $< $@ $(*F)_irx
-
-modules/pademu/usb_pademu.irx: modules/pademu
-	$(MAKE) -C $< USE_USB=1
-
-$(EE_ASM_DIR)usb_pademu.c: modules/pademu/usb_pademu.irx
-	$(BIN2C) $< $@ $(*F)_irx
-
-$(EE_ASM_DIR)bdm.c: $(PS2SDK)/iop/irx/bdm.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-$(EE_ASM_DIR)bdmfs_fatfs.c: $(PS2SDK)/iop/irx/bdmfs_fatfs.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-$(EE_ASM_DIR)iLinkman.c: $(PS2SDK)/iop/irx/iLinkman.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-ifeq ($(DEBUG),1)
-# block device drivers with printf's
-$(EE_ASM_DIR)usbmass_bd.c: $(PS2SDK)/iop/irx/usbmass_bd.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-$(EE_ASM_DIR)usbmass_bd_single.c: modules/usbmass_bd_single.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-$(EE_ASM_DIR)IEEE1394_bd.c: $(PS2SDK)/iop/irx/IEEE1394_bd.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-$(EE_ASM_DIR)mx4sio_bd.c: $(PS2SDK)/iop/irx/mx4sio_bd.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-else
-# block device drivers without printf's
-$(EE_ASM_DIR)usbmass_bd.c: $(PS2SDK)/iop/irx/usbmass_bd_mini.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-$(EE_ASM_DIR)usbmass_bd_single.c: modules/usbmass_bd_mini_single.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-$(EE_ASM_DIR)IEEE1394_bd.c: $(PS2SDK)/iop/irx/IEEE1394_bd_mini.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-$(EE_ASM_DIR)mx4sio_bd.c: $(PS2SDK)/iop/irx/mx4sio_bd_mini.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-endif
-
-modules/bdmevent/bdmevent.irx: modules/bdmevent
-	$(MAKE) -C $<
-
-$(EE_ASM_DIR)bdmevent.c: modules/bdmevent/bdmevent.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-$(EE_ASM_DIR)ps2dev9.c: $(PS2SDK)/iop/irx/ps2dev9.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-modules/network/SMSUTILS/SMSUTILS.irx: modules/network/SMSUTILS
-	$(MAKE) -C $<
-
-$(EE_ASM_DIR)smsutils.c: modules/network/SMSUTILS/SMSUTILS.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-$(EE_ASM_DIR)ps2ip.c: $(PS2SDK)/iop/irx/ps2ip-nm.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-modules/network/SMSTCPIP/SMSTCPIP.irx: modules/network/SMSTCPIP
-	$(MAKE) $(SMSTCPIP_INGAME_CFLAGS) -C $< rebuild
-
-$(EE_ASM_DIR)ingame_smstcpip.c: modules/network/SMSTCPIP/SMSTCPIP.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-modules/network/smap-ingame/smap.irx: modules/network/smap-ingame
-	$(MAKE) -C $<
-
-$(EE_ASM_DIR)smap_ingame.c: modules/network/smap-ingame/smap.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-$(EE_ASM_DIR)smap.c: $(PS2SDK)/iop/irx/smap.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-$(EE_ASM_DIR)netman.c: $(PS2SDK)/iop/irx/netman.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-$(EE_ASM_DIR)ps2ips.c: $(PS2SDK)/iop/irx/ps2ips.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-$(EE_ASM_DIR)smbman.c: $(PS2SDK)/iop/irx/smbman.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-modules/network/smbinit/smbinit.irx: modules/network/smbinit
-	$(MAKE) -C $<
-
-$(EE_ASM_DIR)smbinit.c: modules/network/smbinit/smbinit.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-$(EE_ASM_DIR)ps2atad.c: $(PS2SDK)/iop/irx/ata_bd.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-$(EE_ASM_DIR)hdpro_atad.c: $(PS2SDK)/iop/irx/hdproatad.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-$(EE_ASM_DIR)poweroff.c: $(PS2SDK)/iop/irx/poweroff.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-modules/hdd/xhdd/xhdd.irx: modules/hdd/xhdd
-	$(MAKE) -C $<
-
-$(EE_ASM_DIR)xhdd.c: modules/hdd/xhdd/xhdd.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-$(EE_ASM_DIR)ps2hdd.c: $(PS2SDK)/iop/irx/ps2hdd-osd.irx
-	$(BIN2C) $< $@ $(*F)_irx
-
-$(EE_ASM_DIR)ps2fs.c: $(PS2SDK)/iop/irx/ps2fs-osd.irx
-	$(BIN2C) $< $@ $(*F)_irx
-
-modules/vmc/genvmc/genvmc.irx: modules/vmc/genvmc
-	$(MAKE) $(MOD_DEBUG_FLAGS) -C $<
-
-$(EE_ASM_DIR)genvmc.c: modules/vmc/genvmc/genvmc.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-modules/network/lwNBD/lwnbdsvr.irx: modules/network/lwNBD
-	$(MAKE) TARGET=iop -C $<
-
-$(EE_ASM_DIR)lwnbdsvr.c: modules/network/lwNBD/lwnbdsvr.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-$(EE_ASM_DIR)udptty.c: $(PS2SDK)/iop/irx/udptty.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-$(EE_ASM_DIR)ppctty.c: $(PS2SDK)/iop/irx/ppctty.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-modules/debug/udptty-ingame/udptty.irx: modules/debug/udptty-ingame
-	$(MAKE) -C $<
-
-$(EE_ASM_DIR)udptty-ingame.c: modules/debug/udptty-ingame/udptty.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ udptty_ingame_irx
-
-$(EE_ASM_DIR)ioptrap.c: $(PS2SDK)/iop/irx/ioptrap.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-modules/debug/ps2link/ps2link.irx: modules/debug/ps2link
-	$(MAKE) -C $<
-
-$(EE_ASM_DIR)ps2link.c: modules/debug/ps2link/ps2link.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-modules/network/nbns/nbns.irx: modules/network/nbns
-	$(MAKE) -C $<
-
-$(EE_ASM_DIR)nbns-iop.c: modules/network/nbns/nbns.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ nbns_irx
-
-modules/network/httpclient/httpclient.irx: modules/network/httpclient
-	$(MAKE) -C $<
-
-$(EE_ASM_DIR)httpclient-iop.c: modules/network/httpclient/httpclient.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ httpclient_irx
-
-$(EE_ASM_DIR)iomanx.c: $(PS2SDK)/iop/irx/iomanX.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-$(EE_ASM_DIR)filexio.c: $(PS2SDK)/iop/irx/fileXio.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-$(EE_ASM_DIR)sio2man.c: $(PS2SDK)/iop/irx/freesio2.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-$(EE_ASM_DIR)padman.c: $(PS2SDK)/iop/irx/freepad.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-$(EE_ASM_DIR)mcman.c: $(PS2SDK)/iop/irx/mcman.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-$(EE_ASM_DIR)mcserv.c: $(PS2SDK)/iop/irx/mcserv.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_irx
-
-$(EE_ASM_DIR)poeveticanew.c: thirdparty/PoeVeticaNew.ttf | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_raw
-
-$(EE_ASM_DIR)icon_sys.c: gfx/icon.sys | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)
-
-$(EE_ASM_DIR)icon_icn.c: gfx/list.icn | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)
-
-$(EE_ASM_DIR)icon_cpy_icn.c: gfx/copy.icn | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)
-
-$(EE_ASM_DIR)icon_del_icn.c: gfx/del.icn | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)
-
-$(EE_ASM_DIR)icon_sys_A.c: misc/icon_A.sys | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)
-
-$(EE_ASM_DIR)icon_sys_J.c: misc/icon_J.sys | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)
-
-$(EE_ASM_DIR)icon_sys_C.c: misc/icon_C.sys | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)
-
-$(EE_ASM_DIR)conf_theme_OPL.c: misc/conf_theme_OPL.cfg | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_cfg
-
-$(EE_ASM_DIR)conf_theme_OPL_CF.c: misc/conf_theme_OPL_CF.cfg | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_cfg
-
-$(EE_ASM_DIR)boot.c: audio/boot.adp | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_adp
-
-$(EE_ASM_DIR)cancel.c: audio/cancel.adp | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_adp
-
-$(EE_ASM_DIR)confirm.c: audio/confirm.adp | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_adp
-
-$(EE_ASM_DIR)cursor.c: audio/cursor.adp | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_adp
-
-$(EE_ASM_DIR)message.c: audio/message.adp | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_adp
-
-$(EE_ASM_DIR)transition.c: audio/transition.adp | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_adp
-
-$(EE_ASM_DIR)bd_connect.c: audio/bd_connect.adp | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_adp
-
-$(EE_ASM_DIR)bd_disconnect.c: audio/bd_disconnect.adp | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)_adp
-
-$(EE_ASM_DIR)IOPRP_img.c: modules/iopcore/IOPRP.img | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)
-
-$(EE_ASM_DIR)drvtif_ingame_irx.c: modules/debug/drvtif-ingame.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)
-
-$(EE_ASM_DIR)tifinet_ingame_irx.c: modules/debug/tifinet-ingame.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)
-
-$(EE_ASM_DIR)drvtif_irx.c: modules/debug/drvtif.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)
-
-$(EE_ASM_DIR)tifinet_irx.c: modules/debug/tifinet.irx | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)
-
-$(EE_ASM_DIR)deci2_img.c: modules/debug/deci2.img | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(*F)
-
-$(EE_OBJS_DIR)%.o: $(EE_SRC_DIR)%.c | $(EE_OBJS_DIR)
-	$(EE_CC) $(EE_CFLAGS) $(EE_INCS) -c $< -o $@
-
-$(EE_OBJS_DIR)%.o: $(EE_ASM_DIR)%.c | $(EE_OBJS_DIR)
-	$(EE_CC) $(EE_CFLAGS) $(EE_INCS) -c $< -o $@
-
-$(PNG_ASSETS:%=$(EE_ASM_DIR)%_png.c): $(EE_ASM_DIR)%_png.c: $(PNG_ASSETS_DIR)%.png | $(EE_ASM_DIR)
-	$(BIN2C) $< $@ $(@:$(EE_ASM_DIR)%.c=%)
-
-endif
-
-TRANSLATIONS_LNG = $(TRANSLATIONS:%=$(LNG_DIR)lang_%.lng)
-TRANSLATIONS_YML = $(TRANSLATIONS:%=$(LNG_SRC_DIR)%.yml)
-ENGLISH_TEMPLATE_YML = $(LNG_SRC_DIR)English.yml
-ENGLISH_LNG = $(LNG_SRC_DIR)lang_English.lng
-BASE_LANGUAGE = $(LNG_TMPL_DIR)_base.yml
-INTERNAL_LANGUAGE_C = src/lang_internal.c
-INTERNAL_LANGUAGE_H = include/lang_autogen.h
-LANG_COMPILER = lang_compiler.py
-
-languages: $(ENGLISH_TEMPLATE_YML) $(TRANSLATIONS_YML) $(ENGLISH_LNG) $(TRANSLATIONS_LNG) $(INTERNAL_LANGUAGE_C) $(INTERNAL_LANGUAGE_H)
-
-download_lng:
-	sh $(GITHUB_WORKSPACE)/download_lng.sh
-
-download_lwNBD:
-	sh $(GITHUB_WORKSPACE)/download_lwNBD.sh
-
-download_cfla:
-	sh $(GITHUB_WORKSPACE)/download_cfla.sh
-
-$(TRANSLATIONS_LNG): $(LNG_DIR)lang_%.lng: $(LNG_SRC_DIR)%.yml $(BASE_LANGUAGE) $(LANG_COMPILER)
-	python3 $(LANG_COMPILER) --make_lng --base $(BASE_LANGUAGE) --translation $< $@
-
-$(TRANSLATIONS_YML): %.yml: $(BASE_LANGUAGE) $(LANG_COMPILER)
-	python3 $(LANG_COMPILER) --update_translation_yml --base $(BASE_LANGUAGE) --translation $@
-
-$(ENGLISH_TEMPLATE_YML): $(BASE_LANGUAGE) $(LANG_COMPILER)
-	python3 $(LANG_COMPILER) --make_template_yml --base $< $@
-
-$(ENGLISH_LNG): $(ENGLISH_TEMPLATE_YML) $(BASE_LANGUAGE) $(LANG_COMPILER)
-	python3 $(LANG_COMPILER) --make_lng --base $(BASE_LANGUAGE) --translation $< $@
-
-$(INTERNAL_LANGUAGE_C): $(BASE_LANGUAGE) $(LANG_COMPILER)
-	python3 $(LANG_COMPILER) --make_source --base $< $@
-
-$(INTERNAL_LANGUAGE_H): $(BASE_LANGUAGE) $(LANG_COMPILER)
-	python3 $(LANG_COMPILER) --make_header --base $< $@
-
-ifndef PS2SDK
-ps2sdk-not-setup:
-	@echo "PS2SDK is not setup. Please setup PS2SDK before building this project"
-endif
-
-oplversion:
-	@echo $(OPL_VERSION)
-
-ifdef PS2SDK
-include $(PS2SDK)/samples/Makefile.pref
-include $(PS2SDK)/samples/Makefile.eeglobal
-endif
-
--include $(EE_DEPS)
+list(APPEND EE_CFLAGS -fdata-sections)
+list(APPEND EE_LDFLAGS $(DEBUG_LDFLAGS) -fdata-sections -ffunction-sections -Wl,--gc-sections)
+
+add_compile_definitions(${RTL_CFLAGS} ${DTL_CFLAGS} ${IGS_CFLAGS} ${PADEMU_CFLAGS})
+set(CMAKE_C_FLAGS "${EE_CFLAGS}")
+
+set(CMAKE_LD_FLAGS "${EE_LDFLAGS}")
+
+include_directories(${CMAKE_CURRENT_BINARY_DIR} ${GSKIT}/include ${GSKIT}/ee/dma/include ${GSKIT}/ee/gs/include modules/iopcore/common modules/network/common modules/hdd/common include)
+add_compile_options("${CMAKE_C_FLAGS}")
+
+if(PC_TOOLS STREQUAL "WIN32" OR PC_TOOLS STREQUAL "UNIX")
+    add_custom_target(pc_tools
+        COMMAND ${CMAKE_COMMAND} -E echo "Building iso2opl, opl2iso, and genvmc for ${PC_TOOLS}..."
+        COMMAND ${CMAKE_MAKE_PROGRAM} -C pc _WIN32=$<IF:$<STREQUAL:${PC_TOOLS},WIN32>,0,1>
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/pc
+        COMMENT "Building PC tools for ${PC_TOOLS}..."
+        VERBATIM
+    )
+else()
+ message(FATAL_ERROR "Only WIN32 or UNIX are available, please type correctly
+ or port to another platform")
+endif()
+
+set(BIN2C = ${PS2SDK}/bin/bin2c)
+
+function(import_bin2c irx)
+    add_custom_command(
+        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${irx}_irx.c
+        COMMAND ${BIN2C} ${irx} ${CMAKE_CURRENT_BINARY_DIR}/${irx}_irx.c ${irx}_irx
+        MAIN_DEPENDENCY ${irx}
+        COMMENT "Converting ${irx} to a C header using bin2c..."
+        VERBATIM
+    )
+endfunction()
+
+import_bin2c(eesync.c)
