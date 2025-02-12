@@ -1114,7 +1114,7 @@ static void guiDrawBusy(int alpha)
 
 static void guiRenderGreeting(int alpha)
 {
-    u64 mycolor = GS_SETREG_RGBA(0x00, 0x00, 0x00, alpha);
+    u64 mycolor = GS_SETREG_RGBA(0xFF, 0xFF, 0xFF, alpha);
     rmDrawRect(0, 0, screenWidth, screenHeight, mycolor);
 
     GSTEXTURE *logo = thmGetTexture(LOGO_PICTURE);
@@ -1311,9 +1311,9 @@ void guiDrawBGPlasma()
         for (x = 0; x < PLASMA_W; x++) {
             u32 fper = guiCalcPerlin((float)(2 * x) / PLASMA_W, (float)(2 * y) / PLASMA_H, perz) * 0x80 + 0x80;
 
-            u32 red = ((u32)(fper * curbgColor[0]) + ((0x00 - fper) * ((gTheme->plasBlendColor >> 56) & 0x00))) >> 8;
-            u32 green = ((u32)(fper * curbgColor[1]) + ((0x00 - fper) * ((gTheme->plasBlendColor >> 48) & 0x00))) >> 8;
-            u32 blue = ((u32)(fper * curbgColor[2]) + ((0x00 - fper) * ((gTheme->plasBlendColor >> 40) & 0x00))) >> 8;
+            u32 red = ((u32)(fper * curbgColor[0]) + ((0xFF - fper) * ((gTheme->plasBlendColor >> 56) & 0xFF))) >> 8;
+            u32 green = ((u32)(fper * curbgColor[1]) + ((0xFF - fper) * ((gTheme->plasBlendColor >> 48) & 0xFF))) >> 8;
+            u32 blue = ((u32)(fper * curbgColor[2]) + ((0xFF - fper) * ((gTheme->plasBlendColor >> 40) & 0xFF))) >> 8;
 
             *buf = GS_SETREG_RGBA(red, green, blue, 0x80);
             ++buf;

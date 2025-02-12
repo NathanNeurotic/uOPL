@@ -1,18 +1,24 @@
-# Unoffical-Open-PS2-Loader
+# Open PS2 Loader
 
-Copyright 2013, Ifcaro & jimmikaelkael<br/>
-Copyright 2024-2025, KrahJohilto, Wolf3s and Ripto<br/>
+Copyright 2013, Ifcaro & jimmikaelkael
 Licensed under Academic Free License version 3.0
 Review the LICENSE file for further details.
 
-[![CI](https://github.com/NathanNeurotic/uOPL/actions/workflows/compilation.yml/badge.svg?branch=uOPL-1)](https://github.com/NathanNeurotic/uOPL/actions/workflows/compilation.yml)
-[![Codacy Badge](https://app.codacy.com/project/badge/Grade/99032a6a180243bfa0d0e23efeb0608d)](https://www.codacy.com/gh/NathanNeurotic/uOPL/dashboard?utm_source=github.com&utm_medium=referral&utm_content=NathanNeurotic/uOPL&utm_campaign=Badge_Grade)
-[![Discord](https://img.shields.io/discord/652861436992946216?style=flat&logo=Discord)]([https://discord.gg/CVFUa9xh6B](https://discord.gg/hFRysYVReu))
+[![CI](https://github.com/KrahJohlito/Open-PS2-Loader/actions/workflows/compilation.yml/badge.svg?branch=uOPL-1)](https://github.com/KrahJohlito/Open-PS2-Loader/actions/workflows/compilation.yml)
+[![Codacy Badge](https://app.codacy.com/project/badge/Grade/99032a6a180243bfa0d0e23efeb0608d)](https://www.codacy.com/gh/KrahJohlito/Open-PS2-Loader/dashboard?utm_source=github.com&utm_medium=referral&utm_content=KrahJohlito/Open-PS2-Loader&utm_campaign=Badge_Grade)
+[![Discord](https://img.shields.io/discord/652861436992946216?style=flat&logo=Discord)](https://discord.gg/CVFUa9xh6B)
 
 ## Introduction
 
-U-Open PS2 Loader (u-OPL) is a 100% Open source game and application loader based on [OPL](https://github.com/ps2homebrew/Open-PS2-Loader) for
-the PS2 and PS3 units. This version uses stable features that at the moment was not merged plus unique features.
+Open PS2 Loader (OPL) is a 100% Open source game and application loader for
+the PS2 and PS3 units. It supports five categories of devices: USB mass
+storage devices, MX4SIO (SD card connected to memory card port via adapter), iLink (SBP2 compliant storage devices via IEE1394), SMBv1 shares and the PlayStation 2 HDD unit.
+USB/SMB/MX4SIO/iLink/HDD (ATA) support both USBExtreme and \*.ISO formats while PS2 HDD (APA) supports HDLoader format,
+all devices also support ZSO format (compressed ISO).
+
+This is a forked repository you can find the official repository here:
+<https://github.com/ps2homebrew/Open-PS2-Loader>
+
 <details>
   <summary> <b> Changes in uOPL </b> </summary>
 <p>
@@ -37,8 +43,8 @@ In game settings you will find an option `Loader Core` with the options of `<OPL
 Supported devices: `USB` `MX4SIO` `HDD (ATA)` `iLink` `UDPBD - untested` `HDD (APA) - untested (seems hit & miss for some games)`<br><br>
 Neutrino does not support:<br>
 `ZSO Format` `USBExtreme Format` (Will result in `<OPL>` core being used instead even if `Neutrino` is selected)<br>
-`PADEMU` `GSM` `Cheats` (Will result in `Neutrino` still being used however these features will not be applied because Neutrino uses a diffrent sets of modules than OPL and u-OPL)<br><br>
-Get [Neutrino](https://github.com/rickgaiser/neutrino/releases)
+`PADEMU` `GSM` `Cheats` (Will result in `Neutrino` still being used however these features will not be applied)<br><br>
+Get Neutrino here: https://github.com/rickgaiser/neutrino/releases
 
 ### Additional Theme Options
 These are all optional and will use default values if omitted.
@@ -81,7 +87,7 @@ types come with more or fewer features included.
   <summary> <b> How to use </b> </summary>
 <p>
 
-U-OPL uses the following directory tree structure across HDD, SMB, and
+OPL uses the following directory tree structure across HDD, SMB, and
 USB modes:
 
 | Folder | Description                                          | Modes       |
@@ -95,7 +101,7 @@ USB modes:
 | `LNG`  | for translation support                              | all         |
 | `CHT`  | for cheats files                                     | all         |
 
-U-OPL will automatically create the above directory structure the first time you launch it and enable your favorite device.
+OPL will automatically create the above directory structure the first time you launch it and enable your favorite device.
 
 For HDD (APA) users, OPL will read `hdd0:__common/OPL/conf_hdd.cfg` for the config entry `hdd_partition` to use as your OPL partition.
 If not found a config file, a 128Mb `+OPL` partition will be created. You can edit the config if you wish to use/create a different partition.
@@ -272,7 +278,7 @@ Not supported.
   <summary> <b> ZSO Format </b> </summary>
 <p>
 
-As of version 1.2.0, compressed ISO files in ZSO format is supported by u-OPL.
+As of version 1.2.0, compressed ISO files in ZSO format is supported by OPL.
 
 To handle ZSO files, a python script (ziso.py) is included in the pc folder of this repository.
 It requires Python 3 and the LZ4 library:
@@ -293,7 +299,7 @@ To decompress a ZSO back to the original ISO:
 python ziso.py -c 0 "input.zso" "output.iso"
 ```
 
-You can copy ZSO files to the same folder as your ISOs and they will be detected by u-OPL.
+You can copy ZSO files to the same folder as your ISOs and they will be detected by OPL.
 To install onto internal HDD, you can use the latest version of HDL-Dump.
 
 </p>
@@ -305,7 +311,7 @@ To install onto internal HDD, you can use the latest version of HDL-Dump.
 
 Currently, supported only [PS3 Backward Compatible](https://www.psdevwiki.com/ps3/PS2_Compatibility#PS2-Compatibility) (BC) versions. So only [COK-001](https://www.psdevwiki.com/ps3/COK-00x#COK-001) and [COK-002/COK-002W](https://www.psdevwiki.com/ps3/COK-00x#COK-002) boards are supported. USB, SMB, HDD modes are supported.
 
-To run u-OPL, you need an entry point for running PS2 titles. You can use everything (Swapmagic PS2, for example), but custom firmware with the latest Cobra is preferred. Note: only CFW supports HDD mode.
+To run OPL, you need an entry point for running PS2 titles. You can use everything (Swapmagic PS2, for example), but custom firmware with the latest Cobra is preferred. Note: only CFW supports HDD mode.
 
 </p>
 </details>
@@ -320,10 +326,10 @@ Open PS2 Loader needs the [**latest PS2SDK**](https://github.com/ps2dev/ps2sdk)
 </details>
 
 <details>
-  <summary> <b> u-OPL Archive </b> </summary>
+  <summary> <b> OPL Archive </b> </summary>
 <p>
 
-Since 05/07/2021 every u-OPL build dispatched to the release section of this repository will be uploaded to a [mega account](https://mega.nz/folder/Ndwi1bAK#oLWNhH_g-h0p4BoT4c556A). You can access the archive by clicking the mega badge on top of this readme
+Since 05/07/2021 every OPL build dispatched to the release section of this repository will be uploaded to a [mega account](https://mega.nz/folder/Ndwi1bAK#oLWNhH_g-h0p4BoT4c556A). You can access the archive by clicking the mega badge on top of this readme
 
 </p>
 </details>
@@ -332,19 +338,19 @@ Since 05/07/2021 every u-OPL build dispatched to the release section of this rep
   <summary> <b> Frequent Issues </b> </summary>
 <p>
 
-### u-OPL Freezes on logo or grey screen
+### OPL Freezes on logo or grey screen
 
- Sometimes u-OPL freezes when loading config files made by older u-OPL builds.
-> hold __`START`__ while u-OPL initializes to make it skip the config loading, then, you can save your own settings.
+ Sometimes OPL freezes when loading config files made by older OPL builds.
+> hold __`START`__ while OPL initializes to make it skip the config loading, then, you can save your own settings.
 > fixing the issue.
 
 ### Game freezes on white screen
 
 > Main game executable could not be found. Either game is fragmented or image is corrupted
 
-### u-OPL does not display anything on boot
+### OPL does not display anything on boot
 
-> You may have selected a Video Mode which your TV does not support. Hold Triangle and Cross while u-OPL initializes to reset your video mode to "Auto".
+> You may have selected a Video Mode which your TV does not support. Hold Triangle and Cross while OPL initializes to reset your video mode to "Auto".
 
 </p>
 </details>
