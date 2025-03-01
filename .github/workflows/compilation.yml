@@ -10,7 +10,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-22.04
-    container: ghcr.io/ps2dev/ps2dev@sha256:362bcd26b8bd94149c539f41749edb13facbb5b68a8b960e219fc079693cb95f
+    container: ghcr.io/ps2homebrew/ps2homebrew:main
     steps:
       - name: Install required dependencies
         run: |
@@ -79,8 +79,8 @@ jobs:
         extra: [EXTRA_FEATURES=0, EXTRA_FEATURES=1]
         pademu: [PADEMU=0, PADEMU=1]
         udpbd: [UDPBD=0, UDPBD=1]
-    runs-on: ubuntu-22.04
-    container: ghcr.io/ps2dev/ps2dev@sha256:362bcd26b8bd94149c539f41749edb13facbb5b68a8b960e219fc079693cb95f
+    runs-on: ubuntu-latest
+    container: ghcr.io/ps2homebrew/ps2homebrew:main
     steps:
       - name: Install required dependencies
         run: |
@@ -147,8 +147,8 @@ jobs:
           delete-merged: true
 
   build-lang:
-    runs-on: ubuntu-22.04
-    container: ghcr.io/ps2dev/ps2dev@sha256:362bcd26b8bd94149c539f41749edb13facbb5b68a8b960e219fc079693cb95f
+    runs-on: ubuntu-latest
+    container: ghcr.io/ps2homebrew/ps2homebrew:main
     steps:
       - name: Install required dependencies
         run: |
@@ -205,8 +205,8 @@ jobs:
       matrix:
         debug: [iopcore_debug, ingame_debug, eesio_debug, DTL_T10000=1]
         container_commit: [":main"]
-    runs-on: ubuntu-22.04
-    container: ghcr.io/ps2dev/ps2dev@sha256:362bcd26b8bd94149c539f41749edb13facbb5b68a8b960e219fc079693cb95f
+    runs-on: ubuntu-latest
+    container: ghcr.io/ps2homebrew/ps2homebrew:main
     steps:
       - name: Install required dependencies
         run: |
@@ -262,7 +262,7 @@ jobs:
           path: opl-*.elf
 
   merge-debug:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest10
     needs: build-debug
     steps:
       - name: Merge Artifacts
